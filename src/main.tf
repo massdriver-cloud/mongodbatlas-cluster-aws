@@ -4,7 +4,7 @@ locals {
 }
 
 module "mongodb" {
-  source = "github.com/massdriver-cloud/terraform-modules//mongodbatlas/cluster-aws?ref=c433559"
+  source = "github.com/massdriver-cloud/terraform-modules//mongodbatlas/cluster-aws?ref=efb8551"
 
   mongodb_organization_id        = var.mongodbatlas_creds.organization_id
   name                           = var.md_metadata.name_prefix
