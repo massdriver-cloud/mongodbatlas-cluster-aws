@@ -30,6 +30,7 @@ module "mongodb" {
 
 resource "aws_security_group_rule" "vpc_ingress" {
   count             = 1
+  description       = "Allow VPC to access to MongoDB Atlas cluster ${var.md_metadata.name_prefix}"
   type              = "ingress"
   from_port         = 27015
   to_port           = 27017
