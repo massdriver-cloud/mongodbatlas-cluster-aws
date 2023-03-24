@@ -27,3 +27,13 @@ module "mongodb" {
   pit_enabled                    = try(var.backup.continuous, null)
   labels                         = var.md_metadata.default_tags
 }
+
+resource "aws_security_group_rule" "vpc_ingress" {
+  count             = 1
+  type              = "ingress"
+  from_port         = 27015
+  to_port           = 27017
+  protocol          = "tcp"
+  cidr_blocks       = [var.vpc.data.infrastructure.cidr]
+  security_group_id = module.mongodb.security_group_id
+}
