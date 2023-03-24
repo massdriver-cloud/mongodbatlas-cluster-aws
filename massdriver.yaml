@@ -1,0 +1,416 @@
+# This file will be used to generate all of the schema-*.json files in a bundle
+schema: draft-07
+name: "mongodbatlas-cluster-aws"
+description: "MongoDB Atlas allows you to run a fully managed MongoDB cluster alongside your other resources in AWS, offering low-latency, high-availability with minimal maintenance."
+source_url: github.com/massdriver-cloud/mongodbatlas-cluster-aws
+access: private
+type: "infrastructure"
+
+
+params:
+  examples:
+    - __name: Development
+      database:
+        termination_protection_enabled: false
+        cluster_type: REPLICASET
+        autoscaling:
+          instance_size_min: M10
+          instance_size_max: M40
+      storage:
+        size_gb: 10
+      backup:
+        enabled: false
+    - __name: Production
+      database:
+        termination_protection_enabled: true
+        cluster_type: REPLICASET
+        autoscaling:
+          instance_size_min: M10
+          instance_size_max: M80
+      storage:
+        size_gb: 50
+      backup:
+        enabled: true
+        continuous: true
+    - __name: Sharded
+      database:
+        termination_protection_enabled: true
+        cluster_type: REPLICASET
+        num_shards: 2
+        autoscaling:
+          instance_size_min: M30
+          instance_size_max: M80
+      storage:
+        size_gb: 50
+      backup:
+        enabled: true
+        continuous: true
+  required:
+    - mongodbatlas_creds
+    - database
+    - storage
+    - backup
+  properties:
+    mongodbatlas_creds:
+      title: MongoDB Atlas Credentials
+      type: object
+      required:
+        - organization_id
+        - public_key
+        - private_key
+      properties:
+        organization_id:
+          title: MongoDB Atlas Organization ID
+          type: string
+        public_key:
+          title: Public Key
+          type: string
+        private_key:
+          title: Private Key
+          type: string
+          format: password
+    database:
+      title: Database
+      type: object
+      required:
+        - version
+        - cluster_type
+        - termination_protection_enabled
+        - autoscaling
+        - electable_node_count
+      dependencies:
+        cluster_type:
+          oneOf:
+            - properties:
+                cluster_type:
+                  const: REPLICASET
+            - properties:
+                cluster_type:
+                  const: SHARDED
+                num_shards:
+                  title: Number of Shards
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  maximum: 50
+                autoscaling:
+                  properties:
+                    instance_size_min:
+                      enum: ["M30", "M40", "M50", "M60", "M80", "M140", "M200", "M300", "M400", "M700"]
+                      default: "M30"
+                    instance_size_max:
+                      enum: ["M30", "M40", "M50", "M60", "M80", "M140", "M200", "M300", "M400", "M700"]
+              required:
+                - num_shards
+      properties:
+        version:
+          title: Database Version
+          type: string
+          default: "5.0"
+          enum: ["4.2", "4.4", "5.0", "6.0"]
+        cluster_type:
+          title: Cluster Type
+          type: string
+          default: "REPLICASET"
+          enum: ["REPLICASET", "SHARDED"]
+          $md.immutable: true
+        termination_protection_enabled:
+          title: Termination Protection
+          type: boolean
+          description: Termination protection will protect the cluster from accidental termination (must be disabled before deletion is allowed)
+          default: false
+        autoscaling:
+          title: "Autoscaling Configuration"
+          type: object
+          required:
+            - instance_size_min
+            - instance_size_max
+          properties:
+            instance_size_min:
+              title: Minimum Instance Size
+              type: string
+              default: "M10"
+              enum: ["M10", "M20", "M30", "M40", "M50", "M60", "M80", "M140", "M200", "M300", "M400", "M700"]
+            instance_size_max:
+              title: Maximum Instance Size
+              type: string
+              default: "M40"
+              enum: ["M10", "M20", "M30", "M40", "M50", "M60", "M80", "M140", "M200", "M300", "M400", "M700"]
+        electable_node_count:
+          title: Node Count
+          type: integer
+          default: 3
+          enum: [3, 5, 7]
+    storage:
+      title: Storage
+      type: object
+      required:
+        - size_gb
+        - ebs_volume_type
+      properties:
+        size_gb:
+          title: Disk Size (GB)
+          description: The initial disk size (in GB) of the cluster. Disk autoscaling is enabled, so this value may increase as needed.
+          type: integer
+          default: 10
+          minimum: 10
+          maximum: 4096
+        ebs_volume_type:
+          title: EBS Volume Type
+          type: string
+          description: Type of storage you want to attach to your cluster
+          default: STANDARD
+          enum: ["STANDARD", "PROVISIONED"]
+      dependencies:
+        ebs_volume_type:
+          oneOf:
+            - properties:
+                ebs_volume_type:
+                  const: STANDARD
+            - properties:
+                ebs_volume_type:
+                  const: PROVISIONED
+                iops:
+                  title: Disk IOPS
+                  type: integer
+                  description: Target throughput (IOPS) for disk storage
+                  default: 3000
+                  minimum: 1000
+                  maximum: 40000
+              required:
+                - iops
+    backup:
+      title: Backup
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          title: Enable Backups
+          description: Enable scheduled [cluster backups](https://www.mongodb.com/docs/atlas/backup/cloud-backup/dedicated-cluster-backup/#dedicated-cluster-backups)
+          type: boolean
+          default: true
+      dependencies:
+        enabled:
+          oneOf:
+            - properties:
+                enabled:
+                  const: false
+            - properties:
+                enabled:
+                  const: true
+                continuous:
+                  title: Continuous Cloud Backups
+                  description: "[Continuous Cloud Backups](https://www.mongodb.com/docs/atlas/backup/cloud-backup/dedicated-cluster-backup/#continuous-cloud-backups) replay the oplog to restore a cluster from a particular point in time"
+                  type: boolean
+                  default: false
+                schedule:
+                  title: Backup Schedule
+                  type: array
+                  default:
+                    - frequency_type: hourly
+                      frequency_interval: 6
+                      retention_unit: days
+                      retention_value: 7
+                    - frequency_type: daily
+                      frequency_interval: 1
+                      retention_unit: days
+                      retention_value: 7
+                    - frequency_type: weekly
+                      frequency_interval: 6
+                      retention_unit: weeks
+                      retention_value: 4
+                    - frequency_type: monthly
+                      frequency_interval: 40
+                      retention_unit: months
+                      retention_value: 12
+                  items:
+                    title: Backup Policy
+                    type: object
+                    required:
+                      - frequency_type
+                      - frequency_interval
+                      - retention_unit
+                      - retention_value
+                    properties:
+                      frequency_type:
+                        title: Frequency Type
+                        type: string
+                        description: Backup frequency unit
+                        enum: ["hourly", "daily", "weekly", "monthly"]
+                      frequency_interval:
+                        title: Frequency Interval
+                        type: integer
+                      retention_unit:
+                        title: Retention Duration Unit
+                        type: string
+                      retention_value:
+                        title: Retention Duration Value
+                        type: integer
+                        minimum: 1
+                    dependencies:
+                      frequency_type:
+                        oneOf:
+                          - properties:
+                              frequency_type:
+                                const: hourly
+                              frequency_interval:
+                                enum: [1, 2, 4, 6, 8, 12]
+                              retention_unit:
+                                enum: ["days", "weeks", "months"]
+                          - properties:
+                              frequency_type:
+                                const: daily
+                              frequency_interval:
+                                enum: [1]
+                              retention_unit:
+                                enum: ["days", "weeks", "months"]
+                          - properties:
+                              frequency_type:
+                                const: weekly
+                              retention_unit:
+                                enum: ["weeks", "months"]
+                              frequency_interval:
+                                description: Day of the week
+                                oneOf:
+                                  - title: Monday
+                                    const: 1
+                                  - title: Tuesday
+                                    const: 2
+                                  - title: Wednesday
+                                    const: 3
+                                  - title: Thursday
+                                    const: 4
+                                  - title: Friday
+                                    const: 5
+                                  - title: Saturday
+                                    const: 6
+                                  - title: Sunday
+                                    const: 7
+                          - properties:
+                              frequency_type:
+                                const: monthly
+                              retention_unit:
+                                enum: ["months"]
+                              frequency_interval:
+                                description: Day of the month
+                                oneOf:
+                                  - title: 1st
+                                    const: 1
+                                  - title: 2nd
+                                    const: 2
+                                  - title: 3rd
+                                    const: 3
+                                  - title: 4th
+                                    const: 4
+                                  - title: 5th
+                                    const: 5
+                                  - title: 6th
+                                    const: 6
+                                  - title: 7th
+                                    const: 7
+                                  - title: 8th
+                                    const: 8
+                                  - title: 9th
+                                    const: 9
+                                  - title: 10th
+                                    const: 10
+                                  - title: 11th
+                                    const: 11
+                                  - title: 12th
+                                    const: 12
+                                  - title: 13th
+                                    const: 13
+                                  - title: 14th
+                                    const: 14
+                                  - title: 15th
+                                    const: 15
+                                  - title: 16th
+                                    const: 16
+                                  - title: 17th
+                                    const: 17
+                                  - title: 18th
+                                    const: 18
+                                  - title: 19th
+                                    const: 19
+                                  - title: 20th
+                                    const: 20
+                                  - title: 21st
+                                    const: 21
+                                  - title: 22nd
+                                    const: 22
+                                  - title: 23rd
+                                    const: 23
+                                  - title: 24th
+                                    const: 24
+                                  - title: 25th
+                                    const: 25
+                                  - title: 26th
+                                    const: 26
+                                  - title: 27th
+                                    const: 27
+                                  - title: 28th
+                                    const: 28
+                                  - title: Last Day
+                                    const: 40
+
+
+connections:
+  required:
+  - aws_authentication
+  - vpc
+  properties:
+    aws_authentication:
+      $ref: massdriver/aws-iam-role
+    vpc:
+      $ref: massdriver/aws-vpc
+
+
+artifacts:
+  required:
+    - mongodb
+  properties:
+    mongodb:
+      $ref: massdriver/mongo-authentication
+
+
+ui:
+  ui:order:
+    - mongodbatlas_creds
+    - database
+    - storage
+    - backup
+    - "*"
+  database:
+    ui:order:
+      - version
+      - cluster_type
+      - num_shards
+      - termination_protection_enabled
+      - autoscaling
+      - electable_node_count
+      - "*"
+    autoscaling:
+      ui:order:
+        - instance_size_min
+        - instance_size_max
+        - "*"
+  storage:
+    ui:order:
+      - size_gb
+      - ebs_volume_type
+      - iops
+      - "*"
+  backup:
+    ui:order:
+      - enabled
+      - continuous
+      - schedule
+      - "*"
+    schedule:
+      items:
+        ui:order:
+          - frequency_type
+          - frequency_interval
+          - retention_unit
+          - retention_value
