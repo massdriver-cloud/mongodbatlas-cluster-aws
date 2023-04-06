@@ -28,12 +28,14 @@ module "mongodb" {
   labels                         = var.md_metadata.default_tags
 }
 
+// Private Endpoints can use any port from 1024 to 65535
+// https://www.mongodb.com/docs/atlas/security-private-endpoint/#port-ranges-used-for-private-endpoints
 resource "aws_security_group_rule" "vpc_ingress" {
   count             = 1
   description       = "Allow VPC to access to MongoDB Atlas cluster ${var.md_metadata.name_prefix}"
   type              = "ingress"
-  from_port         = 27015
-  to_port           = 27017
+  from_port         = 1024
+  to_port           = 65535
   protocol          = "tcp"
   cidr_blocks       = [var.vpc.data.infrastructure.cidr]
   security_group_id = module.mongodb.security_group_id
