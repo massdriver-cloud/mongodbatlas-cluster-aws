@@ -6,7 +6,7 @@ locals {
   data_authentication = {
     username = module.mongodb.username
     password = module.mongodb.password
-    hostname = module.mongodb.cluster_srv_connection_url
+    hostname = trimprefix(module.mongodb.cluster_srv_connection_url, "mongodb+srv://")
     port     = 27017
   }
 }
